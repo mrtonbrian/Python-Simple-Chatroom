@@ -1,6 +1,7 @@
 try:
     from tkMessageBox import *
     from Tkinter import *
+    from tkSimpleDialog import *
 except ImportError:
     from tkinter import *
 from ScrolledText import ScrolledText
@@ -14,10 +15,11 @@ import os
 def recv_thread(conn, q):
     while True:
         try:
-            data = conn.recv(4096)
+            data = conn.recv(8192)
             if data:
                 q.put(data)
-        except socket.error:
+        except socket.error, e:
+            print repr(e)
             q.put('Server Disconnect')
 
 
@@ -52,34 +54,66 @@ def update_from_queue():
         pass
     root.after(100, update_from_queue)
 
-
+def check_ip(ip):
+    try:
+        socket.inet_aton(ip)
+        return True
+    except:
+        return False
 def GUI(window):
     global e, s, schedule_queue, txtbx
-    txtbx = ScrolledText(window, state=DISABLED)
-    txtbx.grid(row=0)
+    textbox_frame = Frame(window,width=70)
+    textbox_frame.grid(row=0)
+    window.columnconfigure(1,weight=1)
+    txtbx = ScrolledText(textbox_frame)
     txtbx.see(END)
-    e = Entry(window)
-    e.grid(row=1, column=0)
+    txtbx.pack(fill=BOTH)
+
+    bottom_row = Frame(window,width=70,height=20)
+    e = Entry(bottom_row,width=70)
+    e.pack(fill='both',expand=1)
+
     butt = Button(window, text='Send', command=lambda: send_msg(txtbx))
     window.bind('<Return>', lambda event: send_msg(txtbx))
-    butt.grid(row=1, column=1)
+    butt.grid(column=1)
     schedule_queue = Queue.Queue()
     update_from_queue()
-    sleep(.3)
+    bottom_row.grid(row=1)
+
     threading.Thread(target=lambda: recv_thread(s, schedule_queue)).start()
-
-
+    e.focus_set()
 if __name__ == '__main__':
-    ip_addr = raw_input('IP Address: ')
-    username = raw_input('Username: ')
+    root = Tk()
     port = 9001
     global s
-    s = socket.socket()
-    s.connect((ip_addr, port))
-    sleep(.3)
-    s.send(username)
-    root = Tk()
+    ip_addr_verify = True
+    while True:
+        root.focus_set()
+        if ip_addr_verify == True:
+            ip_addr = askstring('IP Address', "Enter Your Server's IP Address")
+        elif ip_addr_verify == 'INVALID':
+            ip_addr = askstring('Invalid IP Address', "Invalid IP Address \n Please Enter Your Server's IP Address")
+        elif ip_addr_verify == 'CONNECTION':
+            ip_addr = askstring("Connection Problem",
+                                "Couldn't Connect To IP Address \n Please Reenter Your Server's IP Address")
+        if ip_addr == None:
+            os._exit(0)
+        if check_ip(ip_addr):
+            s = socket.socket()
+            s.settimeout(0.3)
+            try:
+                s.connect((ip_addr, port))
+                s.settimeout(None)
+                break
+            except:
+                ip_addr_verify = 'CONNECTION'
+                continue
+            else:
+                ip_addr_verify = 'INVALID'
+    root.focus_set()
+    username = askstring('Username', 'Enter Your Desired Username')
     GUI(root)
+    s.send(username)
     root.mainloop()
     s.close()
     os._exit(0)

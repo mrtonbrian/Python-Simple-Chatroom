@@ -23,7 +23,6 @@ def parse_transcript(username):
         lines = f.readlines()
     new_lines = []
     for i in lines:
-        print i,'Startup' in i
         if 'Startup' in i:
             continue
         if username in i and ('SERVER' not in i):
@@ -37,19 +36,25 @@ def parse_transcript(username):
 def client(conn, u):
     global conns
     #conn.send('Welcome To The Chatroom, You Can Now Send / Receive Messages')
-    for i in parse_transcript(u):
-        conn.send(i.strip('\n')+'\n')
+    try:
+        for i in parse_transcript(u):
+            conn.send(i.strip('\n')+'\n')
+    except:
+        remover(conn,conn.getpeername())
     sleep(.5)
     f = addr_to_user.values()
     del f[f.index(u)]
     f = ', '.join(f)
-    if len(f) != 0:
-        conn.send('Other People Online Are ' + f)
-    else:
-        conn.send('No One Else Is Currently Online')
+    try:
+        if len(f) != 0:
+            conn.send('Other People Online Are ' + f)
+        else:
+            conn.send('No One Else Is Currently Online')
+    except:
+        remover(conn,conn.getpeername())
     try:
         while True:
-            data = conn.recv(4096)
+            data = conn.recv(8192)
             if data:
                 msg = '[' + strftime('%m/%d/%Y %I:%M:%S') + ']~ ' + u + ': ' + data
                 send_all(msg, conn)
