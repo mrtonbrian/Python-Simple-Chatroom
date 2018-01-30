@@ -16,13 +16,17 @@ import zlib
 
 # https://stackoverflow.com/a/29126154/8935887
 class register_login_popup:
-    def __init__(self, root):
+    def __init__(self, root, usernames):
         self.choice = ''
         self.master = Toplevel(root)
         master = self.master
         Label(master, text='Register Or Login?').grid(row=0, column=1)
         Button(master, text='Register', command=lambda: self.set_choice('r')).grid(row=1, column=0)
-        Button(master, text='Login', command=lambda: self.set_choice('l')).grid(row=1, column=2)
+        login_butt = Button(master, text='Login', command=lambda: self.set_choice('l'))
+        login_butt.grid(row=1, column=2)
+        master.focus_set()
+        if usernames == '0':
+            login_butt['state'] = DISABLED
 
     def set_choice(self, c):
         self.master.destroy()
@@ -48,8 +52,8 @@ def recv_thread(conn, q):
             q.put('Server Disconnect')
 
 
-def send_msg(txtbx):
-    global s, e
+def send_msg(txtbx,s):
+    global e
     if len(e.get()) == 0:
         showwarning("Warning", "Can't Send Empty Message")
         return None
@@ -91,8 +95,51 @@ def check_ip(ip):
         return False
 
 
+class get_login_info:
+    def __init__(self, root, sock):
+        self.sock = sock
+        master = Toplevel(root)
+        self.master = master
+        self.worked = False
+        Label(master, text='Username: ').grid(row=0, column=0)
+        self.username_ent = Entry(master)
+        self.username_ent.grid(row=0, column=1)
+
+        Label(master, text='Password').grid(row=1, column=0)
+        self.pass_ent = Entry(master, show='*')
+        self.pass_ent.grid(row=1, column=1)
+
+        Button(master, text='Login', command=self.check_login_credentials).grid(row=2)
+
+    def check_login_credentials(self):
+        if len(self.username_ent.get()) != 0:
+            if len(self.pass_ent.get()) != 0:
+                self.sock.send(self.username_ent.get())
+                print self.username_ent.get()
+                response = self.sock.recv(2048)
+                if response == 'VALID':
+                    self.sock.send(hashlib.sha256(self.pass_ent.get()).hexdigest())
+                    response = self.sock.recv(2048)
+                    if response == 'VALID':
+                        self.worked = True
+                        self.master.destroy()
+                    else:
+                        showerror('Password', 'Incorrect Password!')
+                else:
+                    showerror('Username Not Found')
+            else:
+                showerror('Empty Password', "You Didn't Enter In A Password!")
+        else:
+            showerror('Empty Username', "You Didn't Enter in a Username!")
+
+    def show(self):
+        self.master.deiconify()
+        self.master.wait_window()
+        return self.worked
+
+
 def GUI(window):
-    global e, s, schedule_queue, txtbx
+    global e, schedule_queue, txtbx
     ip_addr_verify = True
     while True:
         root.focus_set()
@@ -118,25 +165,45 @@ def GUI(window):
             else:
                 ip_addr_verify = 'INVALID'
     root.focus_set()
-    user_login_selection = get_login_request(root)
-    s.send(user_login_selection)
+    user_login_selection = register_login_popup(root, s.recv(2)).show()
+    if user_login_selection != None:
+        s.send(user_login_selection)
+    else:
+        s.send(None)
+        os._exit(0)
     if user_login_selection == 'r':
-        times = 1
+        times = 0
         while True:
-            if times == 1:
+            if times == 0:
                 username = askstring('Username', 'Enter Your Desired Username')
-            else:
+            elif times == 'EMPTY':
+                username = askstring('Username','Empty Username Entered')
+                times = 1
+            elif times >= 1 and type(times) == int:
                 username = askstring('Username', 'Username Taken \nEnter Another Username')
+            print username
+            if len(username) == 0:
+                times = 'EMPTY'
+                continue
             s.send(username)
             code = s.recv(2048)
             if code == 'VALID':
                 while True:
                     password = password_input(root, 'Enter Your Desired Password').show()
-                    break
+                    if password != None:
+                        break
+                    else:
+                        os._exit(0)
                 s.send(hashlib.sha256(password).hexdigest())
                 break
             else:
                 times += 1
+        root.deiconify()
+    elif user_login_selection == 'l':
+        s.setblocking(True)
+        worked = get_login_info(root,s).show()
+        if not worked:
+            os._exit(0)
     textbox_frame = Frame(window, width=70)
     textbox_frame.grid(row=0)
     window.columnconfigure(1, weight=1)
@@ -148,7 +215,7 @@ def GUI(window):
     e = Entry(bottom_row, width=70)
     e.pack(fill='both', expand=1)
 
-    butt = Button(window, text='Send', command=lambda: send_msg(txtbx))
+    butt = Button(window, text='Send', command=lambda: send_msg(txtbx,s))
     window.bind('<Return>', lambda event: send_msg(txtbx))
     butt.grid(column=1)
     schedule_queue = Queue.Queue()
@@ -164,6 +231,7 @@ class password_input:
         self.final_pswd = ''
         self.master = Toplevel(root)
         master = self.master
+        master.focus_set()
         Label(master, text=t).grid(row=0)
         Label(master, text='Password: ').grid(row=1, column=0)
         self.pswd = Entry(master, show='*')
@@ -192,15 +260,9 @@ class password_input:
         return self.final_pswd
 
 
-def get_login_request(root):
-    result = register_login_popup(root).show()
-    return result
-
-
 if __name__ == '__main__':
     root = Tk()
     port = 9001
     GUI(root)
     root.mainloop()
-    s.close()
     os._exit(0)
