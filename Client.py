@@ -14,6 +14,8 @@ import hashlib
 import zlib
 
 
+# TODO: Handle Multiple People Signing In w/ The Same Name
+
 # https://stackoverflow.com/a/29126154/8935887
 class register_login_popup:
     def __init__(self, root, usernames):
@@ -62,21 +64,35 @@ def send_msg(txtbx,s):
         if len(txt) >= 170:
             txt = zlib.compress(txt, 9)
         s.send(txt)
-        txtbx.config(state=NORMAL)
-        txtbx.insert(END, '\n' + '[' + strftime('%m/%d/%Y %I:%M:%S') + ']~ ME: ' + e.get())
-        txtbx.config(state=DISABLED)
-        txtbx.see(END)
-        e.delete(0, END)
+        schedule_queue.put('[' + strftime('%m/%d/%Y %I:%M:%S') + ']~ ME: ' + e.get())
+        e.delete(0,END)
+
+def refresh_coloring():
+    lines = txtbx.get('1.0','end-1c').splitlines()
+    txtbx.delete('1.0',END)
+    txtbx.tag_config('others',background='gray77',foreground='black')
+    txtbx.tag_config('server',background='yellow',foreground='red')
+    txtbx.tag_config('user',background='#005ff9',foreground='#000000')
+    for i in lines:
+        if i:
+            line = i+'\n'
+            if ']~ SERVER: ' in i:
+                txtbx.insert(END,line,'server')
+            elif ']~ ME: ' in i:
+                txtbx.insert(END,line,'user')
+            else:
+                txtbx.insert(END,line,'others')
 
 
 def update_from_queue():
-    global schedule_queue, txtbx
     try:
         while True:
             line = schedule_queue.get_nowait()
             if line != 'Server Disconnect':
                 txtbx.config(state=NORMAL)
-                txtbx.insert(END, '\n' + line)
+                #Temporarily Inserts Line In For Refresh of Coloring To Get All Lines
+                txtbx.insert(END,line+'\n')
+                refresh_coloring()
                 txtbx.config(state=DISABLED)
                 txtbx.see('end')
             else:
@@ -126,7 +142,7 @@ class get_login_info:
                     else:
                         showerror('Password', 'Incorrect Password!')
                 else:
-                    showerror('Username Not Found')
+                    showerror('Username Not Found',"Username Not Found")
             else:
                 showerror('Empty Password', "You Didn't Enter In A Password!")
         else:
@@ -216,7 +232,7 @@ def GUI(window):
     e.pack(fill='both', expand=1)
 
     butt = Button(window, text='Send', command=lambda: send_msg(txtbx,s))
-    window.bind('<Return>', lambda event: send_msg(txtbx))
+    window.bind('<Return>', lambda event: send_msg(txtbx,s))
     butt.grid(column=1)
     schedule_queue = Queue.Queue()
     update_from_queue()

@@ -8,6 +8,9 @@ import random
 import hashlib
 import zlib
 
+
+# TODO: Handle Multiple People Signing In w/ The Same Name
+
 def get_ip():
     if sys.platform != 'win64' and sys.platform != 'win32':
         interfaces = netifaces.interfaces()
@@ -152,7 +155,6 @@ def handle_conn(conn, addr):
                 for i in f.readlines():
                     logins.append(i.strip('\n'))
             while True:
-                print 'asdf'
                 username = conn.recv(2048)
                 print 'username:',username
                 if username == None:
@@ -167,8 +169,6 @@ def handle_conn(conn, addr):
                 else:
                     conn.send('INVALID')
                     continue
-                break
-            while True:
                 hashed_pswd = conn.recv(2048)
                 if hashed_pswd == None:
                     return None
@@ -184,6 +184,7 @@ def handle_conn(conn, addr):
                 addr_to_user[addr] = username
                 conns.append(conn)
                 threading._start_new_thread(client, (conn, username))
+                break
     except Exception, e:
         print e
         return None
