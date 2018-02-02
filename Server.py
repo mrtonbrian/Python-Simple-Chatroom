@@ -9,8 +9,6 @@ import hashlib
 import zlib
 
 
-# TODO: Handle Multiple People Signing In w/ The Same Name
-
 def get_ip():
     if sys.platform != 'win64' and sys.platform != 'win32':
         interfaces = netifaces.interfaces()
@@ -45,7 +43,7 @@ def client(conn, u):
         full = ''
         for i in parse_transcript(u):
             full += i.strip('\n') + '\n'
-        compressed = zlib.compress(full,9)
+        compressed = zlib.compress(full, 9)
         conn.send(compressed)
     except:
         remover(conn, conn.getpeername())
@@ -102,14 +100,15 @@ def send_all(msg, conn):
                 if len(msg) <= 170:
                     i.send(msg)
                 else:
-                    i.send(zlib.compress(msg,9))
+                    i.send(zlib.compress(msg, 9))
             else:
                 pass
         except:
             remover(conn, addr_to_user[conn.getpeername()])
 
 
-def generate_salt(char_amount=32, suitable_chars="0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ!@#$%^&*()"):
+def generate_salt(char_amount=32,
+                  suitable_chars="0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ!@#$%^&*()"):
     final = ""
     r = random.SystemRandom()
     for i in xrange(0, char_amount):
@@ -118,7 +117,7 @@ def generate_salt(char_amount=32, suitable_chars="0123456789abcdefghijklmnopqrst
 
 
 def handle_conn(conn, addr):
-    #Handles Any User Disconnects Between Verification
+    # Handles Any User Disconnects Between Verification
     try:
         login_or_username = conn.recv(1024)
         if login_or_username == None:
@@ -141,9 +140,9 @@ def handle_conn(conn, addr):
                     conn.send('VALID')
                     password = conn.recv(4096)
                     break
-            with open('usernames.dat','a+') as f:
+            with open('usernames.dat', 'a+') as f:
                 salt = generate_salt()
-                f.write(username+'`'+hashlib.sha256(password+salt).hexdigest()+'`'+salt+'\n')
+                f.write(username + '`' + hashlib.sha256(password + salt).hexdigest() + '`' + salt + '\n')
                 print '[' + strftime('%m/%d/%Y %I:%M:%S') + ']~' + ' Connection ' + addr[0] + ' ---> ' + username
                 send_all('[' + strftime('%m/%d/%Y %I:%M:%S') + ']~ ' + 'SERVER: ' + username + ' Has Connected', conns)
                 addr_to_user[addr] = username
@@ -151,18 +150,20 @@ def handle_conn(conn, addr):
                 threading._start_new_thread(client, (conn, username))
         elif login_or_username == 'l':
             logins = []
-            with open('usernames.dat','r') as f:
+            with open('usernames.dat', 'r') as f:
                 for i in f.readlines():
                     logins.append(i.strip('\n'))
             while True:
                 username = conn.recv(2048)
-                print 'username:',username
+                print 'username:', username
                 if username == None:
                     return None
+                if username in addr_to_user.keys():
+                    conn.send('LOGGEDIN')
                 for i in logins:
                     stored_username = i.split('`')[0]
                     print stored_username
-                    print stored_username, '==',username,stored_username == username
+                    print stored_username, '==', username, stored_username == username
                     if stored_username == username:
                         conn.send('VALID')
                         break
@@ -174,7 +175,7 @@ def handle_conn(conn, addr):
                     return None
                 for i in logins:
                     splitted = i.split('`')
-                    if hashlib.sha256(hashed_pswd+splitted[2]).hexdigest() == splitted[1] and splitted[0] == username:
+                    if hashlib.sha256(hashed_pswd + splitted[2]).hexdigest() == splitted[1] and splitted[0] == username:
                         conn.send('VALID')
                         break
                 else:
@@ -185,9 +186,9 @@ def handle_conn(conn, addr):
                 conns.append(conn)
                 threading._start_new_thread(client, (conn, username))
                 break
-    except Exception, e:
-        print e
+    except:
         return None
+
 
 if __name__ == '__main__':
     f = open('transcript.txt', 'a+')
@@ -205,7 +206,7 @@ if __name__ == '__main__':
     while True:
         conn, addr = s.accept()
         try:
-            open('usernames.dat','r').close()
+            open('usernames.dat', 'r').close()
             conn.send('1')
         except:
             conn.send('0')

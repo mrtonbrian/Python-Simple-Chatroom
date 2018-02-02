@@ -14,7 +14,166 @@ import hashlib
 import zlib
 
 
-# TODO: Handle Multiple People Signing In w/ The Same Name
+class main_gui:
+    def __init__(self, root):
+        ip_addr_verify = True
+        self.root = root
+        while True:
+            self.root.focus_set()
+            if ip_addr_verify == True:
+                ip_addr = askstring('IP Address', "Enter Your Server's IP Address")
+            elif ip_addr_verify == 'INVALID':
+                ip_addr = askstring('Invalid IP Address', "Invalid IP Address \n Please Enter Your Server's IP Address")
+            elif ip_addr_verify == 'CONNECTION':
+                ip_addr = askstring("Connection Problem",
+                                    "Couldn't Connect To IP Address \n Please Reenter Your Server's IP Address")
+            if ip_addr == None:
+                os._exit(0)
+
+            if self.check_ip(ip_addr):
+                self.s = socket.socket()
+                self.s.settimeout(0.3)
+                try:
+                    self.s.connect((ip_addr, port))
+                    self.s.settimeout(None)
+                    break
+                except:
+                    ip_addr_verify = 'CONNECTION'
+                    continue
+                else:
+                    ip_addr_verify = 'INVALID'
+        self.root.focus_set()
+        user_login_selection = register_login_popup(self.root, self.s.recv(2)).show()
+        if user_login_selection != None:
+            self.s.send(user_login_selection)
+        else:
+            self.s.send(None)
+            os._exit(0)
+        if user_login_selection == 'r':
+            times = 0
+            while True:
+                if times == 0:
+                    username = askstring('Username', 'Enter Your Desired Username')
+                elif times == 'EMPTY':
+                    username = askstring('Username', 'Empty Username Entered')
+                    times = 1
+                elif times >= 1 and type(times) == int:
+                    username = askstring('Username', 'Username Taken \nEnter Another Username')
+                if username == None:
+                    os._exit(0)
+                print username
+                if len(username) == 0:
+                    times = 'EMPTY'
+                    continue
+                self.s.send(username)
+                code = self.s.recv(2048)
+                if code == 'VALID':
+                    while True:
+                        password = password_input(self.root, 'Enter Your Desired Password').show()
+                        if password != None:
+                            break
+                        else:
+                            os._exit(0)
+                    self.s.send(hashlib.sha256(password).hexdigest())
+                    break
+                else:
+                    times += 1
+            self.root.deiconify()
+        elif user_login_selection == 'l':
+            self.s.setblocking(True)
+            worked = get_login_info(root, self.s).show()
+            if not worked:
+                os._exit(0)
+        self.textbox_frame = Frame(root, width=70)
+        self.textbox_frame.grid(row=0)
+        self.root.columnconfigure(1, weight=1)
+        self.txtbx = ScrolledText(self.textbox_frame)
+        self.txtbx.see(END)
+        self.txtbx.pack(fill=BOTH)
+
+        self.bottom_row = Frame(root, width=70, height=20)
+        self.e = Entry(self.bottom_row, width=70)
+        self.e.pack(fill='both', expand=1)
+
+        self.butt = Button(root, text='Send', command=self.send_msg)
+        self.root.focus_set()
+        self.root.bind('<Return>', self.send_msg)
+        self.butt.grid(column=1)
+        self.schedule_queue = Queue.Queue()
+        self.update_from_queue()
+        self.bottom_row.grid(row=1)
+
+        threading.Thread(target=self.recv_thread).start()
+        self.e.focus_set()
+
+    def check_ip(self, ip):
+        try:
+            socket.inet_aton(ip)
+            return True
+        except:
+            return False
+
+    def recv_thread(self):
+        while True:
+            try:
+                data = self.s.recv(8192)
+                if data:
+                    try:
+                        self.schedule_queue.put(zlib.decompress(data))
+                    except:
+                        self.schedule_queue.put(data)
+            except socket.error:
+                self.schedule_queue.put('Server Disconnect')
+            except Exception, e:
+                print repr(e)
+                os._exit(0)
+
+    def update_from_queue(self):
+        try:
+            while True:
+                line = self.schedule_queue.get_nowait()
+                if line != 'Server Disconnect':
+                    self.txtbx.config(state=NORMAL)
+                    # Temporarily Inserts Line In For Refresh of Coloring To Get All Lines
+                    self.txtbx.insert(END, line + '\n')
+                    self.refresh_coloring()
+                    self.txtbx.config(state=DISABLED)
+                    self.txtbx.see('end')
+                else:
+                    showerror('Server', 'Server Has Disconnected')
+                    os._exit(0)
+        except Queue.Empty:
+            pass
+        root.after(100, self.update_from_queue)
+
+    def send_msg(self, event=None):
+        if len(self.e.get()) == 0:
+            showwarning("Warning", "Can't Send Empty Message")
+            return None
+        else:
+            txt = self.e.get()
+            if len(txt) >= 170:
+                txt = zlib.compress(txt, 9)
+            self.s.send(txt)
+            self.schedule_queue.put('[' + strftime('%m/%d/%Y %I:%M:%S') + ']~ ME: ' + self.e.get())
+            self.e.delete(0, END)
+
+    def refresh_coloring(self):
+        lines = self.txtbx.get('1.0', 'end-1c').splitlines()
+        self.txtbx.delete('1.0', END)
+        self.txtbx.tag_config('others', background='gray77', foreground='black')
+        self.txtbx.tag_config('server', background='yellow', foreground='red')
+        self.txtbx.tag_config('user', background='#005ff9', foreground='#000000')
+        for i in lines:
+            if i:
+                line = i + '\n'
+                if ']~ SERVER: ' in i:
+                    self.txtbx.insert(END, line, 'server')
+                elif ']~ ME: ' in i:
+                    self.txtbx.insert(END, line, 'user')
+                else:
+                    self.txtbx.insert(END, line, 'others')
+
 
 # https://stackoverflow.com/a/29126154/8935887
 class register_login_popup:
@@ -38,77 +197,6 @@ class register_login_popup:
         self.master.wm_deiconify()
         self.master.wait_window()
         return self.choice
-
-
-def recv_thread(conn, q):
-    while True:
-        try:
-            data = conn.recv(8192)
-            if data:
-                try:
-                    q.put(zlib.decompress(data))
-                except:
-                    q.put(data)
-        except socket.error, e:
-            print repr(e)
-            q.put('Server Disconnect')
-
-
-def send_msg(txtbx,s):
-    global e
-    if len(e.get()) == 0:
-        showwarning("Warning", "Can't Send Empty Message")
-        return None
-    else:
-        txt = e.get()
-        if len(txt) >= 170:
-            txt = zlib.compress(txt, 9)
-        s.send(txt)
-        schedule_queue.put('[' + strftime('%m/%d/%Y %I:%M:%S') + ']~ ME: ' + e.get())
-        e.delete(0,END)
-
-def refresh_coloring():
-    lines = txtbx.get('1.0','end-1c').splitlines()
-    txtbx.delete('1.0',END)
-    txtbx.tag_config('others',background='gray77',foreground='black')
-    txtbx.tag_config('server',background='yellow',foreground='red')
-    txtbx.tag_config('user',background='#005ff9',foreground='#000000')
-    for i in lines:
-        if i:
-            line = i+'\n'
-            if ']~ SERVER: ' in i:
-                txtbx.insert(END,line,'server')
-            elif ']~ ME: ' in i:
-                txtbx.insert(END,line,'user')
-            else:
-                txtbx.insert(END,line,'others')
-
-
-def update_from_queue():
-    try:
-        while True:
-            line = schedule_queue.get_nowait()
-            if line != 'Server Disconnect':
-                txtbx.config(state=NORMAL)
-                #Temporarily Inserts Line In For Refresh of Coloring To Get All Lines
-                txtbx.insert(END,line+'\n')
-                refresh_coloring()
-                txtbx.config(state=DISABLED)
-                txtbx.see('end')
-            else:
-                showerror('Server', 'Server Has Disconnected')
-                os._exit(0)
-    except Queue.Empty:
-        pass
-    root.after(100, update_from_queue)
-
-
-def check_ip(ip):
-    try:
-        socket.inet_aton(ip)
-        return True
-    except:
-        return False
 
 
 class get_login_info:
@@ -141,8 +229,10 @@ class get_login_info:
                         self.master.destroy()
                     else:
                         showerror('Password', 'Incorrect Password!')
+                elif response == 'LOGGEDIN':
+                    showerror('Already Logged In', 'You Or Someone Else Has Already Logged In!')
                 else:
-                    showerror('Username Not Found',"Username Not Found")
+                    showerror('Username Not Found', "Username Not Found")
             else:
                 showerror('Empty Password', "You Didn't Enter In A Password!")
         else:
@@ -152,94 +242,6 @@ class get_login_info:
         self.master.deiconify()
         self.master.wait_window()
         return self.worked
-
-
-def GUI(window):
-    global e, schedule_queue, txtbx
-    ip_addr_verify = True
-    while True:
-        root.focus_set()
-        if ip_addr_verify == True:
-            ip_addr = askstring('IP Address', "Enter Your Server's IP Address")
-        elif ip_addr_verify == 'INVALID':
-            ip_addr = askstring('Invalid IP Address', "Invalid IP Address \n Please Enter Your Server's IP Address")
-        elif ip_addr_verify == 'CONNECTION':
-            ip_addr = askstring("Connection Problem",
-                                "Couldn't Connect To IP Address \n Please Reenter Your Server's IP Address")
-        if ip_addr == None:
-            os._exit(0)
-        if check_ip(ip_addr):
-            s = socket.socket()
-            s.settimeout(0.3)
-            try:
-                s.connect((ip_addr, port))
-                s.settimeout(None)
-                break
-            except:
-                ip_addr_verify = 'CONNECTION'
-                continue
-            else:
-                ip_addr_verify = 'INVALID'
-    root.focus_set()
-    user_login_selection = register_login_popup(root, s.recv(2)).show()
-    if user_login_selection != None:
-        s.send(user_login_selection)
-    else:
-        s.send(None)
-        os._exit(0)
-    if user_login_selection == 'r':
-        times = 0
-        while True:
-            if times == 0:
-                username = askstring('Username', 'Enter Your Desired Username')
-            elif times == 'EMPTY':
-                username = askstring('Username','Empty Username Entered')
-                times = 1
-            elif times >= 1 and type(times) == int:
-                username = askstring('Username', 'Username Taken \nEnter Another Username')
-            print username
-            if len(username) == 0:
-                times = 'EMPTY'
-                continue
-            s.send(username)
-            code = s.recv(2048)
-            if code == 'VALID':
-                while True:
-                    password = password_input(root, 'Enter Your Desired Password').show()
-                    if password != None:
-                        break
-                    else:
-                        os._exit(0)
-                s.send(hashlib.sha256(password).hexdigest())
-                break
-            else:
-                times += 1
-        root.deiconify()
-    elif user_login_selection == 'l':
-        s.setblocking(True)
-        worked = get_login_info(root,s).show()
-        if not worked:
-            os._exit(0)
-    textbox_frame = Frame(window, width=70)
-    textbox_frame.grid(row=0)
-    window.columnconfigure(1, weight=1)
-    txtbx = ScrolledText(textbox_frame)
-    txtbx.see(END)
-    txtbx.pack(fill=BOTH)
-
-    bottom_row = Frame(window, width=70, height=20)
-    e = Entry(bottom_row, width=70)
-    e.pack(fill='both', expand=1)
-
-    butt = Button(window, text='Send', command=lambda: send_msg(txtbx,s))
-    window.bind('<Return>', lambda event: send_msg(txtbx,s))
-    butt.grid(column=1)
-    schedule_queue = Queue.Queue()
-    update_from_queue()
-    bottom_row.grid(row=1)
-
-    threading.Thread(target=lambda: recv_thread(s, schedule_queue)).start()
-    e.focus_set()
 
 
 class password_input:
@@ -279,6 +281,6 @@ class password_input:
 if __name__ == '__main__':
     root = Tk()
     port = 9001
-    GUI(root)
+    main_gui(root)
     root.mainloop()
     os._exit(0)
