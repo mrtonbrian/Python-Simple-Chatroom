@@ -106,6 +106,11 @@ class main_gui:
         threading.Thread(target=self.recv_thread).start()
         self.e.focus_set()
 
+        root.bind('<Control-KeyRelease-a>',self.select_all)
+
+    def select_all(self,event):
+        self.e.select_range(0,END)
+        self.e.icursor(len(self.e.get()))
     def check_ip(self, ip):
         try:
             socket.inet_aton(ip)
@@ -283,6 +288,7 @@ class password_input:
 
 if __name__ == '__main__':
     root = Tk()
+    root.title('Python Simple Chatroom')
     port = 5000
     main_gui(root)
     root.mainloop()
