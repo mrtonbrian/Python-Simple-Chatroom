@@ -8,8 +8,7 @@ import random
 import hashlib
 import zlib
 
-
-def get_ip():
+def get_local_ip():
     if sys.platform != 'win64' and sys.platform != 'win32':
         interfaces = netifaces.interfaces()
         if 'eth0' in interfaces:
@@ -196,9 +195,10 @@ if __name__ == '__main__':
     f.close()
     s = socket.socket()
     s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-
-    print get_ip()
-    s.bind((get_ip(), 9001))
+    port = 5000
+    local_ip = False
+    print get_local_ip()
+    s.bind((get_local_ip(), port))
     s.listen(500)
     global conns, addr_to_user
     conns = []

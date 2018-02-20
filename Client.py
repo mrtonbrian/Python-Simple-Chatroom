@@ -196,7 +196,10 @@ class register_login_popup:
     def show(self):
         self.master.wm_deiconify()
         self.master.wait_window()
-        return self.choice
+        if self.choice == '':
+            os._exit(1)
+        else:
+            return self.choice
 
 
 class get_login_info:
@@ -280,7 +283,7 @@ class password_input:
 
 if __name__ == '__main__':
     root = Tk()
-    port = 9001
+    port = 5000
     main_gui(root)
     root.mainloop()
     os._exit(0)
