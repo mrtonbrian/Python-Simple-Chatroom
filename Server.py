@@ -3,10 +3,11 @@ import threading
 from time import strftime, sleep
 import sys
 import netifaces
-import atexit
 import random
+import json
 import hashlib
 import zlib
+
 
 def get_local_ip():
     if sys.platform != 'win64' and sys.platform != 'win32':
@@ -43,9 +44,12 @@ def client(conn, u):
         for i in parse_transcript(u):
             full += i.strip('\n') + '\n'
         compressed = zlib.compress(full, 9)
-        conn.send(compressed)
-    except:
+        data = {'type': "TEXT", 'msg': repr(compressed)}
+        conn.send(json.dumps(data))
+    except Exception as e:
+        print repr(e)
         remover(conn, conn.getpeername())
+        return
     sleep(.5)
     f = addr_to_user.values()
     try:
@@ -55,29 +59,37 @@ def client(conn, u):
     f = ', '.join(f)
     try:
         if len(f) != 0:
-            conn.send('Other People Online Are ' + f)
+            conn.send(json.dumps({'type': 'TEXT', 'msg': repr('Other People Online Are ' + f)}))
         else:
-            conn.send('No One Else Is Currently Online')
+            conn.send(json.dumps({'type': "TEXT", 'msg': repr('No One Else Is Currently Online')}))
     except:
         remover(conn, conn.getpeername())
+        return
     try:
         while True:
-            data = conn.recv(8192)
+            data = conn.recv(3000000)
             if data:
-                try:
-                    data = zlib.decompress(data)
-                except:
-                    pass
-                msg = '[' + strftime('%m/%d/%Y %I:%M:%S') + ']~ ' + u + ': ' + data
-                send_all(msg, conn)
-                print msg
+                sent_json = json.loads(data)
+                if sent_json['type'] == 'TEXT':
+                    sent_msg = sent_json['msg']
+                    try:
+                        sent_msg = zlib.decompress(sent_msg)
+                    except:
+                        pass
+                    msg = '[' + strftime('%m/%d/%Y %I:%M:%S') + ']~ ' + u + ': ' + sent_msg
+                    send_all(msg, conn)
+                    print msg
             else:
                 try:
                     remover(conn, conn.getpeername())
-                except:
-                    pass
-    except:
+                    return
+                except Exception as e:
+                    print repr(e)
+                    #pass
+    except Exception as e:
+        print repr(e)
         remover(conn, conn.getpeername())
+        return
 
 
 def remover(c, addr):
@@ -97,13 +109,16 @@ def send_all(msg, conn):
         try:
             if i != conn:
                 if len(msg) <= 170:
-                    i.send(msg)
+                    data_to_send = {'type': "TEXT", 'msg': repr(msg)}
+                    i.send(json.dumps(data_to_send))
                 else:
-                    i.send(zlib.compress(msg, 9))
+                    data_to_send = {'type': "TEXT", 'msg': repr(zlib.compress(msg, 9))}
+                    i.send(json.dumps(data_to_send))
             else:
                 pass
         except:
             remover(conn, addr_to_user[conn.getpeername()])
+            return
 
 
 def generate_salt(char_amount=32,
@@ -208,6 +223,6 @@ if __name__ == '__main__':
         try:
             open('usernames.dat', 'r').close()
             conn.send('1')
-        except:
+        except IOError:
             conn.send('0')
         threading._start_new_thread(handle_conn, (conn, addr))

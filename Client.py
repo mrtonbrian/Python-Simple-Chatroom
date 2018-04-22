@@ -12,7 +12,8 @@ import Queue
 import os
 import hashlib
 import zlib
-
+import json
+import ast
 
 class main_gui:
     def __init__(self, root):
@@ -40,14 +41,15 @@ class main_gui:
                 except:
                     ip_addr_verify = 'CONNECTION'
                     continue
-                else:
-                    ip_addr_verify = 'INVALID'
+            else:
+                ip_addr_verify = 'INVALID'
         self.root.focus_set()
         user_login_selection = register_login_popup(self.root, self.s.recv(2)).show()
         if user_login_selection != None:
             self.s.send(user_login_selection)
         else:
             self.s.send(None)
+
             os._exit(0)
         if user_login_selection == 'r':
             times = 0
@@ -106,11 +108,12 @@ class main_gui:
         threading.Thread(target=self.recv_thread).start()
         self.e.focus_set()
 
-        root.bind('<Control-KeyRelease-a>',self.select_all)
+        root.bind('<Control-KeyRelease-a>', self.select_all)
 
-    def select_all(self,event):
-        self.e.select_range(0,END)
+    def select_all(self, event):
+        self.e.select_range(0, END)
         self.e.icursor(len(self.e.get()))
+
     def check_ip(self, ip):
         try:
             socket.inet_aton(ip)
@@ -121,12 +124,14 @@ class main_gui:
     def recv_thread(self):
         while True:
             try:
-                data = self.s.recv(8192)
+                data = self.s.recv(300000)
                 if data:
-                    try:
-                        self.schedule_queue.put(zlib.decompress(data))
-                    except:
-                        self.schedule_queue.put(data)
+                    sent_json = json.loads(data)
+                    if sent_json['type'] == 'TEXT':
+                        try:
+                            self.schedule_queue.put(zlib.decompress(ast.literal_eval(sent_json['msg'])))
+                        except:
+                            self.schedule_queue.put(ast.literal_eval(sent_json['msg']))
             except socket.error:
                 self.schedule_queue.put('Server Disconnect')
             except Exception, e:
@@ -157,9 +162,10 @@ class main_gui:
             return None
         else:
             txt = self.e.get()
-            if len(txt) >= 170:
+            if len(txt) > 170:
                 txt = zlib.compress(txt, 9)
-            self.s.send(txt)
+            data = {'type': 'TEXT', 'msg': txt}
+            self.s.send(json.dumps(data))
             self.schedule_queue.put('[' + strftime('%m/%d/%Y %I:%M:%S') + ']~ ME: ' + self.e.get())
             self.e.delete(0, END)
 
@@ -215,6 +221,7 @@ class get_login_info:
         self.worked = False
         Label(master, text='Username: ').grid(row=0, column=0)
         self.username_ent = Entry(master)
+        self.username_ent.focus_set()
         self.username_ent.grid(row=0, column=1)
 
         Label(master, text='Password').grid(row=1, column=0)
@@ -261,6 +268,7 @@ class password_input:
         Label(master, text=t).grid(row=0)
         Label(master, text='Password: ').grid(row=1, column=0)
         self.pswd = Entry(master, show='*')
+        self.pswd.focus_set()
         self.pswd.grid(row=1, column=1)
         Label(master, text='Reenter Your Password: ').grid(row=2, column=0)
         self.reentered = Entry(master, show='*')
