@@ -80,12 +80,12 @@ class main_gui:
                     break
                 else:
                     times += 1
-            self.root.deiconify()
         elif user_login_selection == 'l':
             self.s.setblocking(True)
             worked = get_login_info(root, self.s).show()
             if not worked:
                 os._exit(0)
+        self.root.deiconify()
         self.textbox_frame = Frame(root, width=70)
         self.textbox_frame.grid(row=0)
         self.root.columnconfigure(1, weight=1)
