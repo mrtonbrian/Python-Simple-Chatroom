@@ -20,7 +20,7 @@ class main_gui:
         ip_addr_verify = True
         self.root = root
         while True:
-            self.root.focus_set()
+            self.root.withdraw()
             if ip_addr_verify == True:
                 ip_addr = askstring('IP Address', "Enter Your Server's IP Address")
             elif ip_addr_verify == 'INVALID':
@@ -98,7 +98,6 @@ class main_gui:
         self.e.pack(fill='both', expand=1)
 
         self.butt = Button(root, text='Send', command=self.send_msg)
-        self.root.focus_set()
         self.root.bind('<Return>', self.send_msg)
         self.butt.grid(column=1)
         self.schedule_queue = Queue.Queue()
@@ -227,7 +226,7 @@ class get_login_info:
         Label(master, text='Password').grid(row=1, column=0)
         self.pass_ent = Entry(master, show='*')
         self.pass_ent.grid(row=1, column=1)
-
+        self.pass_ent.bind("<Return>",lambda event: self.check_login_credentials)
         Button(master, text='Login', command=self.check_login_credentials).grid(row=2)
 
     def check_login_credentials(self):
@@ -274,7 +273,7 @@ class password_input:
         self.reentered = Entry(master, show='*')
         self.reentered.grid(row=2, column=1)
         Button(master, text='OK', command=self.on_ok).grid(row=3)
-        master.bind('<Return>', lambda event: self.on_ok)
+        self.reentered.bind('<Return>', lambda event: self.on_ok)
 
     def on_ok(self):
         inp_pswd = self.pswd.get()

@@ -29,7 +29,7 @@ def parse_transcript(username):
     for i in lines:
         if 'Startup' in i:
             continue
-        if username in i and ('SERVER' not in i):
+        if ']~ ' + username in i.split(':')[2] and ('SERVER' not in i):
             new_lines.append(i.replace(username, 'ME'))
         else:
             new_lines.append(i)
