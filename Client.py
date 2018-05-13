@@ -15,20 +15,21 @@ import zlib
 import json
 import ast
 
+
 class main_gui:
     def __init__(self, root):
         ip_addr_verify = True
         self.root = root
         while True:
             self.root.withdraw()
-            if ip_addr_verify == True:
+            if ip_addr_verify:
                 ip_addr = askstring('IP Address', "Enter Your Server's IP Address")
             elif ip_addr_verify == 'INVALID':
                 ip_addr = askstring('Invalid IP Address', "Invalid IP Address \n Please Enter Your Server's IP Address")
             elif ip_addr_verify == 'CONNECTION':
                 ip_addr = askstring("Connection Problem",
                                     "Couldn't Connect To IP Address \n Please Reenter Your Server's IP Address")
-            if ip_addr == None:
+            if ip_addr is None:
                 os._exit(0)
 
             if self.check_ip(ip_addr):
@@ -129,7 +130,7 @@ class main_gui:
                     if sent_json['type'] == 'TEXT':
                         try:
                             self.schedule_queue.put(zlib.decompress(ast.literal_eval(sent_json['msg'])))
-                        except:
+                        except zlib.error:
                             self.schedule_queue.put(ast.literal_eval(sent_json['msg']))
             except socket.error:
                 self.schedule_queue.put('Server Disconnect')
@@ -143,9 +144,7 @@ class main_gui:
                 line = self.schedule_queue.get_nowait()
                 if line != 'Server Disconnect':
                     self.txtbx.config(state=NORMAL)
-                    # Temporarily Inserts Line In For Refresh of Coloring To Get All Lines
-                    self.txtbx.insert(END, line + '\n')
-                    self.refresh_coloring()
+                    self.add_to_txtbx(line)
                     self.txtbx.config(state=DISABLED)
                     self.txtbx.see('end')
                 else:
@@ -168,21 +167,18 @@ class main_gui:
             self.schedule_queue.put('[' + strftime('%m/%d/%Y %I:%M:%S') + ']~ ME: ' + self.e.get())
             self.e.delete(0, END)
 
-    def refresh_coloring(self):
-        lines = self.txtbx.get('1.0', 'end-1c').splitlines()
-        self.txtbx.delete('1.0', END)
+    def add_to_txtbx(self, line):
         self.txtbx.tag_config('others', background='gray77', foreground='black')
         self.txtbx.tag_config('server', background='yellow', foreground='red')
         self.txtbx.tag_config('user', background='#005ff9', foreground='#000000')
-        for i in lines:
-            if i:
-                line = i + '\n'
-                if ']~ SERVER: ' in i:
-                    self.txtbx.insert(END, line, 'server')
-                elif ']~ ME: ' in i:
-                    self.txtbx.insert(END, line, 'user')
-                else:
-                    self.txtbx.insert(END, line, 'others')
+        if line:
+            line += '\n'
+            if ']~ SERVER: ' in line:
+                self.txtbx.insert(END, line, 'server')
+            elif ']~ ME: ' in line:
+                self.txtbx.insert(END, line, 'user')
+            else:
+                self.txtbx.insert(END, line, 'others')
 
 
 # https://stackoverflow.com/a/29126154/8935887
@@ -226,7 +222,7 @@ class get_login_info:
         Label(master, text='Password').grid(row=1, column=0)
         self.pass_ent = Entry(master, show='*')
         self.pass_ent.grid(row=1, column=1)
-        self.pass_ent.bind("<Return>",lambda event: self.check_login_credentials)
+        self.pass_ent.bind("<Return>", lambda event: self.check_login_credentials)
         Button(master, text='Login', command=self.check_login_credentials).grid(row=2)
 
     def check_login_credentials(self):
